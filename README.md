@@ -19,7 +19,7 @@ actual contents and the header says which model wrote them.
 Python 3.9 or newer and git. There are no other dependencies.
 
 ```
-git clone <this repository>
+git clone https://github.com/elonmasai7/git-ofrenda
 cd git-ofrenda
 pip install .
 ```
@@ -36,7 +36,7 @@ git-ofrenda seance              # serve a page where you can talk to them
 git-ofrenda exhume . ./grave    # restore their final contents into ./grave
 ```
 
-`git-ofrenda [repo]` is shorthand for `git-ofrenda build [repo]`. To try it without a repository of your
+`git-ofrenda https://github.com/elonmasai7/git-ofrenda` is shorthand for `git-ofrenda build [repo]`. To try it without a repository of your
 own, `python examples/make_demo_repo.py /tmp/demo-repo` builds one with a plausible history.
 
 ![Terminal session](docs/screenshots/06-terminal.png)
