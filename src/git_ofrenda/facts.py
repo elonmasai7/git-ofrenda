@@ -14,13 +14,14 @@ _IMPORTS = [
 ]
 _STOP = {"os", "sys", "re", "json", "time", "typing", "random", "math", "__future__", "datetime"}
 _DOC = re.compile(r'("""|\'\'\')(.+?)\1', re.S)
+MIN_INTENT_LEN = 15
 _COMMENT = re.compile(r"^\s*(?:#(?!!)|//|--)\s*(\S.*)$", re.M)
 
 
 def functions(src: str, limit: int = 5) -> List[str]:
     seen: List[str] = []
     for m in _DEF.finditer(src):
-        if m.group(1) not in seen:
+        if len(m.group(1)) >= 3 and m.group(1) not in seen:  # skips names like $ or _
             seen.append(m.group(1))
     return seen[:limit]
 
@@ -36,9 +37,16 @@ def dependencies(src: str, limit: int = 3) -> List[str]:
 
 
 def intent(src: str) -> Optional[str]:
-    """What the file said it was for: first docstring or comment line."""
-    m = _DOC.search(src)
+    """What the file said it was for: a docstring or comment near the top.
+
+    Only the first few non-blank lines are considered, and very short comments
+    are ignored, so stray notes like "# fix 2" are not mistaken for a purpose.
+    """
+    head = "\n".join([l for l in src.splitlines() if l.strip()][:6])
+    m = _DOC.search(head)
     if m and m.group(2).strip():
-        return m.group(2).strip().splitlines()[0].strip()[:90]
-    m = _COMMENT.search(src)
-    return m.group(1).strip()[:90] if m else None
+        text = m.group(2).strip().splitlines()[0].strip()
+    else:
+        m = _COMMENT.search(head)
+        text = m.group(1).strip() if m else ""
+    return text[:90] if len(text) >= MIN_INTENT_LEN else None

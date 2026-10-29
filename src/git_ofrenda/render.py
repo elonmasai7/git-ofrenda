@@ -13,11 +13,11 @@ STRINGS = {
     "en": dict(intro="The files this repository lost, remembered by the commits that outlived them.",
                cause="Cause of death", killer="Taken by", loved="Loved by", lived="lived", days="days",
                commits="commits", seance="Hold a séance", ask="Ask", ph="Ask the ghost...", forget="forget this conversation",
-               title="Ofrenda for"),
+               title="Ofrenda for", kicker="Día de los Muertos"),
     "es": dict(intro="Los archivos que este repositorio perdió, recordados por los commits que los sobrevivieron.",
                cause="Causa de muerte", killer="Se lo llevó", loved="Lo quisieron", lived="vivió", days="días",
                commits="commits", seance="Hacer una sesión espiritista", ask="Preguntar", ph="Pregúntale al fantasma...",
-               forget="olvidar esta conversación", title="Ofrenda para"),
+               forget="olvidar esta conversación", title="Ofrenda para", kicker="Día de los Muertos"),
 }
 
 
@@ -35,7 +35,7 @@ def html_page(repo_name: str, ghosts: List[Ghost], lang: str = "en", interactive
     e, s = html.escape, STRINGS.get(lang, STRINGS["en"])
     cards = []
     for g in ghosts:
-        chat = (f'<button class="summon" type="button">&#128367; {e(s["seance"])}</button>'
+        chat = (f'<button class="summon" type="button">{e(s["seance"])}</button>'
                 f'<div class="chat" hidden><div class="log"></div><div class="row">'
                 f'<input placeholder="{e(s["ph"])}" maxlength="500" aria-label="{e(s["ph"])}">'
                 f'<button class="send" type="button">{e(s["ask"])}</button></div>'
@@ -57,7 +57,7 @@ def html_page(repo_name: str, ghosts: List[Ghost], lang: str = "en", interactive
     return f"""<!doctype html><html lang="{e(lang)}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(s["title"])} {e(repo_name)}</title>
 <style>{_asset("ofrenda.css")}</style></head><body><header>
-<div class="banner" aria-hidden="true">🏵️ 💀 🕯️ 💀 🏵️</div><h1>{e(s["title"])} {e(repo_name)}</h1>
+<p class="kicker">{e(s["kicker"])}</p><h1>{e(s["title"])} {e(repo_name)}</h1>
 <p>{e(s["intro"])} {e(poet.summary(ghosts, lang))}</p></header>
 <main class="grid">{"".join(cards)}</main>
 <footer>git-ofrenda {__version__}</footer>{script}</body></html>"""

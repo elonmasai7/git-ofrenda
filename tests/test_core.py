@@ -1,3 +1,4 @@
+import dataclasses
 import os
 import subprocess
 import sys
@@ -86,12 +87,14 @@ class ScanTests(RepoCase):
 
 class FactsTests(unittest.TestCase):
     def test_extraction(self):
-        src = 'import ftplib\nimport os\n\ndef upload(x):\n    """Push things."""\n'
+        src = 'import ftplib\nimport os\n\ndef upload(x):\n    """Push things to the server."""\n'
         self.assertEqual(facts.functions(src), ["upload"])
         self.assertEqual(facts.dependencies(src), ["ftplib"])
-        self.assertEqual(facts.intent(src), "Push things.")
+        self.assertEqual(facts.intent(src), "Push things to the server.")
         self.assertEqual(facts.dependencies("const w = require('winston');"), ["winston"])
-        self.assertEqual(facts.intent("#!/bin/sh\n# deploy it\n"), "deploy it")
+        self.assertEqual(facts.intent("#!/bin/sh\n# deploy it to production\n"), "deploy it to production")
+        self.assertIsNone(facts.intent("x = 1\n# tweak 1\n"))  # too short to be a purpose
+        self.assertIsNone(facts.intent("\n".join(["x = 1"] * 8) + "\n# a long comment far down the file\n"))
 
 
 class PoetTests(RepoCase):
@@ -101,6 +104,15 @@ class PoetTests(RepoCase):
             last, cal = poet.template_verse(g, lang)
             self.assertEqual(len(cal.splitlines()), 4)
             self.assertTrue(last)
+
+    def test_template_never_invents_a_function(self):
+        g = dataclasses.replace(self.ghost("docs/roadmap_2020.md"))
+        for lang in ("en", "es"):
+            last, cal = poet.template_verse(g, lang)
+            self.assertNotIn("()", last + cal)  # a markdown file has no functions to claim
+        code = self.ghost("legacy/ftp_uploader.py")
+        seen = " ".join(" ".join(poet.template_verse(dataclasses.replace(code, commit=str(i)), "en")) for i in range(40))
+        self.assertIn("upload_report()", seen)
 
     def test_templates_are_deterministic(self):
         g = self.ghost("src/captcha_v1.py")
@@ -125,8 +137,8 @@ class PoetTests(RepoCase):
         cache = VerseCache(os.path.join(self.tmp, "verses.json"))
         with FakeServer() as srv:
             b = llm.OllamaBackend(srv.url, "gemma3")
-            poet.compose(gitscan_copy(g), b, "en", cache)
-            first = gitscan_copy(g)
+            poet.compose(dataclasses.replace(g), b, "en", cache)
+            first = dataclasses.replace(g)
             poet.compose(first, b, "en", cache)  # served from cache
             self.assertEqual(sum(1 for p, _ in srv.requests if p == "/api/generate"), 1)
             self.assertEqual(first.voice, "model:gemma3")
@@ -135,14 +147,14 @@ class PoetTests(RepoCase):
             prompt = srv.requests[0][1]["prompt"]
             self.assertIn("upload_report", prompt)
             self.assertIn("remove ftp, partner moved to S3", prompt)
-            poet.compose(gitscan_copy(g), b, "en", cache, refresh=True)
+            poet.compose(dataclasses.replace(g), b, "en", cache, refresh=True)
             self.assertEqual(sum(1 for p, _ in srv.requests if p == "/api/generate"), 2)
         # cache survives a restart
         self.assertIsNotNone(VerseCache(os.path.join(self.tmp, "verses.json")).get(
             VerseCache.key(str(prompts.PROMPT_VERSION), "ollama:gemma3", "en", g.commit, g.path)))
 
     def test_bad_format_retries_then_falls_back(self):
-        g = gitscan_copy(self.ghost("src/captcha_v1.py"))
+        g = dataclasses.replace(self.ghost("src/captcha_v1.py"))
         with FakeServer(reply="Sure! Here is a poem about a file.") as srv:
             poet.compose(g, llm.OllamaBackend(srv.url, "gemma3"), "en")
             self.assertEqual(sum(1 for p, _ in srv.requests if p == "/api/generate"), poet.ATTEMPTS)
@@ -150,22 +162,17 @@ class PoetTests(RepoCase):
         self.assertTrue(g.calavera)
 
     def test_unreachable_model_falls_back(self):
-        g = gitscan_copy(self.ghost("src/captcha_v1.py"))
+        g = dataclasses.replace(self.ghost("src/captcha_v1.py"))
         poet.compose(g, llm.OllamaBackend("http://127.0.0.1:1", "gemma3"))
         self.assertEqual(g.voice, "template")
 
     def test_summary_is_honest(self):
-        a, b = gitscan_copy(self.ghost("src/captcha_v1.py")), gitscan_copy(self.ghost("legacy/ftp_uploader.py"))
+        a, b = dataclasses.replace(self.ghost("src/captcha_v1.py")), dataclasses.replace(self.ghost("legacy/ftp_uploader.py"))
         self.assertIn("no model was used", poet.summary([a, b]))
         a.voice = "model:gemma3"
         self.assertIn("1 of 2", poet.summary([a, b]))
         b.voice = "model:gemma3"
         self.assertIn("written by gemma3", poet.summary([a, b]))
-
-
-def gitscan_copy(g):
-    import dataclasses
-    return dataclasses.replace(g)
 
 
 class ParseTests(unittest.TestCase):

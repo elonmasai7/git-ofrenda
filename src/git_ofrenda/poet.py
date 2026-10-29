@@ -33,44 +33,48 @@ def _short(text: str, n: int = 60) -> str:
     return text if len(text) <= n else text[: n - 1].rstrip() + "…"
 
 
-_EN_VERSES = [
-    "Here lies {name}, humble and true,\n{span} it ran and {n} commits it knew.\n{killer} came with a final rm,\nno tests, no tears, no alarm.",
-    "O {name}, you carried {fn}() with pride,\nthrough {n} commits you never lied.\n{killer} laid you down, the diff turned red,\nand now you're marigolds instead.",
-    "They say {name} is dead and gone,\nbut its history still carries on.\n{n} commits whisper in the git log's night,\nand {fn}() still glows in candlelight.",
+_EN_BASE = ("Here lies {name}, humble and true,\n{span} it ran and {n} commits it knew.\n"
+            "{killer} came with a final rm,\nno tests, no tears, no alarm.")
+_EN_FN = [
+    "O {name}, you carried {fn} with pride,\nthrough {n} commits you never lied.\n"
+    "{killer} laid you down, the diff turned red,\nand now you're marigolds instead.",
+    "They say {name} is dead and gone,\nbut its history still carries on.\n"
+    "{n} commits whisper in the git log's night,\nand {fn} still glows in candlelight.",
 ]
 _EN_DEP = ("{name} leaned on {dep}, loyal and small,\n{span} it stood, then took the fall.\n"
            "{killer} swung the delete key's blade,\nand in the log its legend stayed.")
 
-_ES_VERSES = [
-    "Aquí yace {name}, fiel compañero,\n{span} vivió, {n} commits fue su sendero.\n{killer} llegó con su delete certero,\ny hoy baila en el log como un lucero.",
-    "La Catrina visitó a {name} un día,\n{killer} escribió: \"{cause}\" con alegría.\n{fn}() ya no corre, pero no se olvida,\nvive en el historial, de cempasúchil vestida.",
-]
+_ES_BASE = ("Aquí yace {name}, fiel compañero,\n{span} vivió, {n} commits fue su sendero.\n"
+            "{killer} llegó con su delete certero,\ny hoy baila en el log como un lucero.")
+_ES_FN = ("La Catrina visitó a {name} un día,\n{killer} escribió: \"{cause}\" con alegría.\n"
+          "{fn} ya no corre, pero no se olvida,\nvive en el historial, de cempasúchil vestida.")
 
 
 def template_verse(g: Ghost, lang: str = "en"):
-    """(last_words, calavera) built from real facts about the file."""
+    """(last_words, calavera) built only from facts found in the file and its history."""
     seed = _seed(g)
     fns, deps, why = facts.functions(g.source), facts.dependencies(g.source), facts.intent(g.source)
-    fn = fns[0] if fns else g.name
     vals = dict(name=g.name, span=span(g.days, lang), n=g.commits, killer=g.killer,
-                fn=fn, dep=deps[0] if deps else "", cause=_short(g.cause))
+                fn=f"{fns[0]}()" if fns else "", dep=deps[0] if deps else "", cause=_short(g.cause))
     if lang == "es":
-        cal = _ES_VERSES[seed % len(_ES_VERSES)].format(**vals)
-        opts = [f"Fui {fn}() durante {vals['span']}. No me olviden."]
+        verses = [_ES_BASE] + ([_ES_FN] if fns else [])
+        opts = [f"Viví {vals['span']} y fui lo que pude. No me olviden."]
+        if fns:
+            opts.append(f"Fui {vals['fn']} durante {vals['span']}. No me olviden.")
         if deps:
-            opts.append(f"Me apoyé en {deps[0]} durante {vals['span']}. Que no me olviden.")
+            opts.append(f"Me apoyé en {vals['dep']} durante {vals['span']}. Que no me olviden.")
         if why:
             opts.append(f"Quería ser esto: \"{why}\". Y lo fui.")
-        return opts[seed % len(opts)], cal
-    verses = _EN_VERSES + ([_EN_DEP] if deps else [])
-    cal = verses[seed % len(verses)].format(**vals)
-    opts = [f"I carried {fn}() for {vals['span']}. Tell the next file to write tests.",
-            f"I lived {vals['span']}. Then: \"{_short(g.cause)}\". Fair enough."]
-    if why:
-        opts.append(f"All I ever wanted was this: \"{why}\"")
-    if deps:
-        opts.append(f"I leaned on {deps[0]} for {vals['span']}. Do not let them forget me.")
-    return opts[(seed >> 8) % len(opts)], cal
+    else:
+        verses = [_EN_BASE] + (_EN_FN if fns else []) + ([_EN_DEP] if deps else [])
+        opts = [f"I lived {vals['span']}. Then: \"{vals['cause']}\". Fair enough."]
+        if fns:
+            opts.append(f"I carried {vals['fn']} for {vals['span']}. Tell the next file to write tests.")
+        if why:
+            opts.append(f"All I ever wanted was this: \"{why}\"")
+        if deps:
+            opts.append(f"I leaned on {vals['dep']} for {vals['span']}. Do not let them forget me.")
+    return opts[(seed >> 8) % len(opts)], verses[seed % len(verses)].format(**vals)
 
 
 # ------------------------------------------------------------ model mode
